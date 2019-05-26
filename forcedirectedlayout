@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="pragma" content="no-cache">
+	<title>My Forcedirectedlayout</title>
+	<script type="text/javascript" src="d3.js"></script>
+</head>
+
+<body class="centered">
+	<div id='main'></div>
+	<div id='viz'></div>
+	<div id='footer'></div>
+	<script type="text/javascript" >
+	  const CANVAS_wIDTH=1000;
+	  const CANVAS_HEIGHT=1000;
+      var dt = 10000;
+      var G = 6.67384e-11;
+      var e = 1;
+      var theta = 0.5;
+      
+      var bean = [];
+      
+      var maxmass = 3;
+      var maxradius = 300;
+      var minradius = 40;
+      
+      bean.push({});
+      bean[0].m=maxmass*1000;
+      bean[0].x=CANVAS_wIDTH/2;
+      bean[0].y=CANVAS_HEIGHT/2;
+      bean[0].vx=0;
+      bean[0].vy=0;
+      bean[0].ax=0;
+      bean[0].ay=0;
+      bean[0].id='root';
+      
+	  var mNodeList=[];
+	  var mEdgeList=[];
+	  var mNodeMap={};
+      
+	 function ForceDirected()
+	{
+		//存入数据节点
+		for(let i=0; i<graph.nodes.length; i++)
+		{
+			mNodeList.push(new Node(graph.nodes[i].id,i));
+		}
+		//存入边信息
+		for(let i=0; i<graph.links.length; i++)
+		{
+			let source = graph.links[i].source;
+			let target = graph.links[i].target;
+			mEdgeList.push(new Edge(source,target));
+		}
+
+		//初始化
+		for(var i=0; i<mNodeList.length; i++)
+		{
+			var node = {};
+            //初始化点的中心、角度
+			var r=minradius+Math.random()*(maxradius-minradius);
+			var a=Math.random()*Math.PI*2;
+			node.x=CANVAS_wIDTH/2+r*Math.cos(a);
+			node.y=CANVAS_HEIGHT/2+r*Math.sin(a);
+
+           //点和中心点的距离
+			var dx=node.x-bean[0].x;
+			var dy=node.y-bean[0].y;
+			var d=Math.sqrt(dx*dx+dy*dy);
+            
+            //计算速率 G*m/r
+			var v=Math.sqrt(G*bean[0].m/d);
+
+			//分解速率
+			node.vx=v * dy/d;
+			node.vy=v * -dx/d;
+
+			//随机设置点的质量
+			node.m=Math.random()*maxmass;
+
+			//初始化速度
+			node.ax=0;
+			node.ay=0;
+
+			//存入点值
+			let point = mNodeList[i];
+			if(point)
+			{
+				mNodeMap[point.id]=point;
+			}
+
+			mNodeMap[point.id].x=node.x;
+			mNodeMap[point.id].y=node.y;
+
+			node.id=point.id;
+
+			bean.push(node);
+		};
+
+		for(let i=0; i<mEdgeList.length; i++)
+		{
+			let eStartID=mEdgeList[i].source;
+			let eEndID=mEdgeList[i].target;
+			mEdgeList[i].x1=mNodeMap[eStartID].x;
+			mEdgeList[i].y1=mNodeMap[eStartID].y;
+			mEdgeList[i].x2=mNodeMap[eEndID].x;
+			mEdgeList[i].y2=mNodeMap[eEndID].y;
+		}
+
+		d3.select("body").style({'WIDTH':CANVAS_wIDTH+'px'});
+
+		var mainsvg = d3.select("#viz")
+			.append("svg")
+			.attr("width",CANVAS_wIDTH)
+			.attr("height",CANVAS_HEIGHT);
+
+		var rectGroup=mainsvg.append('g');
+
+
+		//绘制边
+		mainsvg.selectAll('line')
+			.data(mEdgeList)
+			.enter().append('line')
+			.attr('x1',function(d){return d.x1})
+			.attr('y1',function(d){return d.y1})
+			.attr('x2',function(d){return d.x2})
+			.attr('y2',function(d){return d.y2});
+
+		//绘制点
+		mainsvg.selectAll('circle')
+			.data(bean)
+			.enter()
+			.append('circle')
+			.attr('cx',function(d){return d.x})
+			.attr('cy',function(d){return d.y})
+			.attr('r',3);
+
+		(function update(){
+			function cmp(arr, prop, fn){
+				var res=prop(arr[0]);
+				for(var i=0; i<arr.length; i++)
+				{
+					res=fn(res,prop(arr[i]));
+				};
+				return res;
+			}
+
+			var qroot={};
+
+			var bounds={
+				minx:cmp(bean,function(d){return d.x;},Math.min),
+				maxx:cmp(bean,function(d){return d.x;},Math.max),
+				miny:cmp(bean,function(d){return d.y;},Math.min),
+				maxy:cmp(bean,function(d){return d.y;},Math.max),
+			};
+			constructQtree(qroot, bean, bounds);
+
+
+			function calculatea(bean,point){
+				if(point == undefined)
+					return;
+				else if(point.body=bean)
+					return;
+
+				var dx=point.body.x-bean.x;
+				var dy=point.body.y-bean.y;
+				var d=Math.sqrt(dx*dx+dy*dy);
+				var boundwidth = point.bounds.maxx-point.bounds.minx;
+
+				if(boundwidth/d <= theta || (point.q1 === undefined && point.q2 ===undefined && point.q3 === undefined && point.q4 === defined)){
+					var dx=node.x-point.body.x;
+					var dy=node.y-point.body.y;
+					var d=Math.max(Math.sqrt(dx*dx+dy*dy),e);
+					var f=G*point.body.m/(d*d);
+
+					//互相吸引
+					node.ax -= f*(dx/d);
+					node.ay -= f*(dy/d);
+				}else{
+					if(point.q1 != undefined)
+						calculatea(node,point.q1);
+					if(point.q2 != undefined)
+						calculatea(node,point.q2);
+					if(point.q3 != undefined)
+						calculatea(node,point.q3);
+					if(point.q4 != undefined)
+						calculatea(node,point.q4);
+				}
+			}
+
+			for(var i=1; i<bean.length; i++)
+			{
+				bean[i].ax=0;
+				bean[i].ay=0;
+				calculatea(bean[i],qroot);
+			}
+
+			for(var i=1; i<bean.length; i++)
+			{
+				bean[i].vx += bean[i].ax * dt;
+				bean[i].vy += bean[i].ay * dt;
+				bean[i].x += bean[i].vx * dt;
+				bean[i].y += bean[i].vy * dt;
+				mNodeMap[bean[i].id].x = bean[i].x;
+				mNodeMap[bean[i].id].y = bean[i].y; 
+			}
+
+			for(let i=0; i<mEdgeList.length;i++)
+			{
+				let eStartID = mEdgeList[i].source;
+				let eEndID = mEdgeList[i].target;
+				mEdgeList[i].x1 = mNodeMap[eStartID].x;
+				mEdgeList[i].y1 = mNodeMap[eStartID].y;
+				mEdgeList[i].x2 = mNodeMap[eEndID].x;
+				mEdgeList[i].y2 = mNodeMap[eEndID].y; 
+			}
+
+			mainsvg.selectAll('line')
+				.data(mEdgeList)
+				.attr('x1',function(d){return d.x1})
+				.attr('y1',function(d){return d.y1})
+				.attr('x2',function(d){return d.x2})
+				.attr('y2',function(d){return d.y2});
+
+			mainsvg.selectAll('circle')
+				.data(bean)
+				.attr('cx',function(d){return d.x})
+				.attr('cy',function(d){return d.y});
+
+			drawQuads(qroot);
+
+			setTimeout(update,0);
+
+		})();
+
+		function constructionQTree(point,particles,bounds)
+		{
+			point.bounds = bounds;
+			if(particles.length==1)
+			{
+				point.body = particles[0];
+				return;
+			}else{
+				var centerofmassx=0;
+				var centerofmassy=0;
+				var totalmass =0 ;
+
+				for(var i=0; i<particles.length; i++)
+				{
+					centerofmassx += particles[i].x*particles[i].m;
+					centerofmassy += particles[i].y*particles[i].m;
+					totalmass += particles[i].m;
+				};
+
+				centerofmassx /= totalmass;
+				centerofmassy /= totalmass;
+
+				point.body = {
+					x : centerofmassx;
+					y : centerofmassy;
+					m : totalmass
+				}
+			}
+
+			var qlList = [];
+			var q2List = [];
+			var q3List = [];
+			var q4List = [];
+
+			var centerx = (bounds.minx + bounds.maxx) / 2;
+			var centery = (bounds.miny + bounds.maxy) / 2;
+
+			for(var i=0; i<particles.length; i++)
+			{
+				if(particles[i].x < centerx && particles[i].y < centery)
+					q1List.push(particles[i]);
+				else if(particles[i].x >= centerx && particles[i].y < centery)
+					q2List.push(particles[i]);
+				else if(particles[i].x >= centerx && particles[i].y >= centery)
+					q3List.push(particles[i]);
+				else if(particles[i].x < centerx && particles[i].y >= centery)
+					q4List.push(particles[i]);
+			};
+
+			if(q1List.length > 0)
+			{
+				point.q1 = {};
+				constructionQTree(point.q1, q1List, {
+					minx : bounds.minx,
+					maxx : centerx,
+					miny : bounds.miny,
+					maxy : centery
+				});
+			}
+
+			if(q2List.length > 0)
+			{
+				point.q2 = {};
+				constructionQTree(point.q2, q2List, {
+					minx : centerx,
+					maxx : bounds.maxx,
+					miny : bounds.miny,
+					maxy : centery
+				});
+			}
+
+			if(q3List.length > 0)
+			{
+				point.q3 = {};
+				constructionQTree(point.q3, q3List, {
+					minx : centerx,
+					maxx : bounds.maxx,
+					miny : centery,
+					maxy : bounds.maxy
+				});
+			}
+
+			if(q4List.length > 0)
+			{
+				point.q4 = {};
+				constructionQTree(point.q4, q4List, {
+					minx : bounds.minx,
+					maxx : centerx,
+					miny : centery,
+					maxy : bounds.maxy
+				});
+			}
+		}
+
+
+		function drawQuads(qroot)
+		{
+			var quads = [];
+			(function traverse(point)
+			{
+				if(point !== undefined)
+				{
+					quads.push(point.bounds);
+					traverse(point.q1);
+					traverse(point.q2);
+					traverse(point.q3);
+					traverse(point.q4);
+				}
+			})(qroot);
+
+			var rects = rectGroup.selectAll('rect').data(quads);
+			rects.enter().append('rect');
+			rects
+				.attr('x',function(d) { return d.minx; })
+				.attr('y',function(d) { return d.miny; })
+				.attr('width', function(d) {return d.maxx-d.minx; })
+				.attr('height', function(d) {return d.maxy-d.miny; });
+			rects.exit().remove();
+		}
+    });
+
+		function Node(id = null, i = null)
+		{
+			this.id=id;
+			this.x=22;
+			this.y=null;
+			this.i=i;
+		}
+		function Edge(source = null, target=null)
+		{
+			this.source=source;
+			this.target=target;
+			this.x1=null;
+			this.y1=null;
+			this.x2=null;
+			this.y2=null;
+		}
+		
+	
+		</script>
+	</body>
+</head>
